@@ -1,20 +1,32 @@
 {
-    "name": "valeriomonti/auto-alt-text",
-    "license": "MIT",
+    "name": "gloomcheng/contextual-alt-text",
+    "description": "Automatically generate context-aware alt text for images using various AI providers, including Hugging Face. Generates descriptions based on image content and the surrounding post/page context.",
+    "license": "GPL-3.0-or-later",
     "autoload": {
         "psr-4": {
-            "AATXT\\": "src/"
+            "ContextualAltText\\": "src/"
         }
     },
     "authors": [
         {
+            "name": "Fuyuan Cheng",
+            "email": "gloomcheng@gmail.com"
+        },
+        {
             "name": "Valerio Monti",
-            "email": "valerio.monti@vmweb.it"
+            "email": "valerio.monti@vmweb.it",
+            "homepage": "https://www.vmweb.it",
+            "role": "Original Author"
         }
     ],
     "config": {
         "allow-plugins": {
-            "php-http/discovery": true
+            "php-http/discovery": true,
+            "dealerdirect/phpcodesniffer-composer-installer": true
         }
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "*",
+        "wp-coding-standards/wpcs": "*"
     }
 }

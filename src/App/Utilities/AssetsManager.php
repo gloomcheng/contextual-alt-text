@@ -1,6 +1,6 @@
 <?php
 
-namespace AATXT\App\Utilities;
+namespace ContextualAltText\App\Utilities;
 
 final class AssetsManager
 {
@@ -15,7 +15,7 @@ final class AssetsManager
 
     public function getAssetUrl(string $filename, bool $isStyle = false): string
     {
-        $manifestPath = AATXT_ABSPATH . '/dist/.vite/manifest.json';
+        $manifestPath = CONTEXTUAL_ALT_TEXT_ABSPATH . '/dist/.vite/manifest.json';
 
         if (!file_exists($manifestPath)) {
             return '';
@@ -30,7 +30,6 @@ final class AssetsManager
         }
         $file = $isStyle && isset($entry['css']) ? $entry['css'][0] : $entry['file'];
 
-        return AATXT_URL . 'dist/' . $file;
+        return CONTEXTUAL_ALT_TEXT_URL . 'dist/' . $file;
     }
-
 }

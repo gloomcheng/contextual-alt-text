@@ -1,14 +1,13 @@
 <?php
 
-namespace AATXT\App\AIProviders\Azure;
+namespace ContextualAltText\App\AIProviders\Azure;
 
-use AATXT\App\Admin\PluginOptions;
-use AATXT\App\AIProviders\AITranslatorInterface;
-use AATXT\App\Exceptions\Azure\AzureTranslateInstanceException;
+use ContextualAltText\App\Admin\PluginOptions;
+use ContextualAltText\App\AIProviders\AITranslatorInterface;
+use ContextualAltText\App\Exceptions\Azure\AzureTranslateInstanceException;
 
 class AzureTranslator implements AITranslatorInterface
 {
-
     private function __construct()
     {
     }
@@ -20,8 +19,9 @@ class AzureTranslator implements AITranslatorInterface
 
     /**
      * Translate a string sending a request to the Azure translation Api
-     * @param string $text
-     * @param string $language
+     *
+     * @param  string $text
+     * @param  string $language
      * @return string
      * @throws AzureTranslateInstanceException
      */
@@ -45,11 +45,13 @@ class AzureTranslator implements AITranslatorInterface
                     'Ocp-Apim-Subscription-Key' => $apiKey,
                     'Ocp-Apim-Subscription-Region' => $region,
                 ],
-                'body' => json_encode([
+                'body' => json_encode(
+                    [
                     [
                         'Text' => $text
                     ]
-                ]),
+                    ]
+                ),
                 'method' => 'POST',
             ]
         );
@@ -79,6 +81,7 @@ class AzureTranslator implements AITranslatorInterface
 
     /**
      * Get the list of supported languages from Azure Api
+     *
      * @return array
      * @throws AzureTranslateInstanceException
      */
@@ -97,22 +100,22 @@ class AzureTranslator implements AITranslatorInterface
 
         $url = $endpoint . $route;
 
-        $headers = array(
+        $headers = [
             'Content-type' => 'application/json',
             'Ocp-Apim-Subscription-Key' => $apiKey
-        );
+        ];
 
         $response = wp_remote_get(
             $url,
-            array(
+            [
                 'headers' => $headers
-            )
+            ]
         );
 
         $bodyResult = json_decode(wp_remote_retrieve_body($response), true);
 
         if (empty($bodyResult)) {
-            throw new AzureTranslateInstanceException(esc_html__('No language retrieved: maybe the translation endpoint is wrong. Please check it out and try again.', 'auto-alt-text'));
+            throw new AzureTranslateInstanceException(esc_html__('No language retrieved: maybe the translation endpoint is wrong. Please check it out and try again.', 'contextual-alt-text'));
         }
 
         if (array_key_exists('error', $bodyResult)) {

@@ -1,281 +1,496 @@
 <?php
 
-namespace AATXT\App;
+namespace ContextualAltText\App;
 
-use AATXT\App\Admin\MediaLibrary;
-use AATXT\App\Logging\DBLogger;
-use AATXT\App\Admin\PluginOptions;
-use AATXT\App\AIProviders\Azure\AzureComputerVisionCaptionsResponse;
-use AATXT\App\AIProviders\OpenAI\Fallback;
-use AATXT\App\AIProviders\OpenAI\OpenAIVision;
-use AATXT\App\Exceptions\Azure\AzureException;
-use AATXT\App\Exceptions\OpenAI\OpenAIException;
-use AATXT\Config\Constants;
-use WpOrg\Requests\Exception;
 
+use ContextualAltText\App\AIProviders\HuggingFace\HuggingFaceVision;
+use ContextualAltText\App\AIProviders\HuggingFace\HuggingFaceText;
+
+use ContextualAltText\App\Admin\PluginOptions;
+use ContextualAltText\App\Logging\DBLogger;
+use ContextualAltText\Config\Constants;
 
 class Setup
 {
-    private static ?self $instance = null;
+    private static $instance;
+
+    public static function getInstance()
+    {
+        if (null === self::$instance) {
+            self::$instance = new self();
+        }
+        return self::$instance;
+    }
 
     private function __construct()
     {
-        //
+        // Primary hook for when attachment metadata is generated
+        add_filter('wp_generate_attachment_metadata', [$this, 'altText'], 10, 2);
+        
+        // Secondary hook for when new attachments are added (backup)
+        add_action('add_attachment', [$this, 'generateAltTextForNewAttachment'], 10, 1);
+        
+        // Hook for when images are inserted into posts/pages
+        add_action('wp_insert_attachment', [$this, 'generateAltTextForNewAttachment'], 10, 1);
+        
+        // Additional hooks for block editor compatibility
+        add_action('wp_ajax_upload-attachment', [$this, 'handleBlockEditorUpload'], 5);
+        add_action('wp_ajax_nopriv_upload-attachment', [$this, 'handleBlockEditorUpload'], 5);
+        
+        // Hook for REST API uploads (used by block editor)
+        add_action('rest_after_insert_attachment', [$this, 'handleRestApiUpload'], 10, 3);
+        
+        // Ensure alt text is generated after upload completion
+        add_action('wp_update_attachment_metadata', [$this, 'ensureAltTextAfterUpload'], 10, 2);
+        
+        // Register cron hook for scheduled alt text generation
+        add_action('contextual_alt_text_generate', [$this, 'scheduledAltTextGeneration']);
     }
 
     /**
-     * Register plugin functionalities
-     * @return void
+     * Main function to generate alt text for an attachment.
+     * Follows a 3-stage process:
+     * 1. Generate a description from the image (Vision Provider).
+     * 2. Refine the description into alt text (Text Provider).
+     * 3. Translate the alt text if needed.
+     *
+     * @param  array $metadata      An array of attachment metadata.
+     * @param  int   $attachment_id The attachment ID.
+     * @return array The updated attachment metadata.
      */
-    public static function register(): void
+    public function altText($metadata, $attachment_id)
     {
-        if (is_null(self::$instance)) {
-            self::$instance = new self();
+        // 調試日誌：記錄方法被調用
+        DBLogger::make()->writeLog('info', 'altText method called', [
+            'attachment_id' => $attachment_id,
+            'metadata_exists' => !empty($metadata)
+        ], $attachment_id);
+        
+        // Early return if plugin is disabled
+        if (!get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_ENABLE_PLUGIN, false)) {
+            DBLogger::make()->writeLog('warning', 'Plugin is disabled, skipping alt text generation', [], $attachment_id);
+            return $metadata;
         }
 
-        //Register plugin options pages
-        PluginOptions::register();
-        //Register medial library hooks
-        MediaLibrary::register();
+        // Skip if the attachment is not an image
+        if (!wp_attachment_is_image($attachment_id)) {
+            DBLogger::make()->writeLog('info', 'Attachment is not an image, skipping', [], $attachment_id);
+            return $metadata;
+        }
 
-        register_activation_hook(AATXT_FILE_ABSPATH, [self::$instance, 'activatePlugin']);
-        register_deactivation_hook(AATXT_FILE_ABSPATH, [self::$instance, 'deactivatePlugin']);
+        // Skip if alt text already exists and preserve setting is enabled
+        $existing_alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        if (!empty($existing_alt) && get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_PRESERVE_EXISTING_ALT_TEXT, false)) {
+            DBLogger::make()->writeLog('info', 'Skipping: Alt text already exists and preserve setting is enabled', [], $attachment_id);
+            return $metadata;
+        }
 
-        // When attachment is uploaded, create alt text
-        add_action('add_attachment', [self::$instance, 'addAltText']);
-        // When plugin is loaded, load text domain
-        add_action('plugins_loaded', [self::$instance, 'loadTextDomain']);
-        // Add settings link to the plugin in the plugins listing
-        add_filter('plugin_action_links_auto-alt-text/auto-alt-text.php', [self::$instance, 'settingsLink']);
-        // Register bulk action for media library
-        add_filter('bulk_actions-upload', [self::$instance, 'registerBulkAction']);
-        // Handle alt text generation bulk action for media library
-        add_action('load-upload.php', [self::$instance, 'handleAltTextBulkAction']);
-        // Display a notice after alt text generation bulk action
-        add_action('admin_notices', [self::$instance, 'altTextBulkActionAdminNotice']);
-    }
+        // Get the image URL
+        $image_url = wp_get_attachment_url($attachment_id);
+        if (!$image_url) {
+            DBLogger::make()->writeLog('error', 'Could not get attachment URL', [], $attachment_id);
+            return $metadata;
+        }
 
-    /**
-     * Register bulk action for media library
-     */
-    public static function registerBulkAction(array $actions): array
-    {
-        $actions['auto_alt_text'] = esc_attr__('Generate Alt Text', 'auto-alt-text');
-        return $actions;
-    }
+        DBLogger::make()->writeLog('info', 'Starting alt text generation', ['image_url' => $image_url], $attachment_id);
 
-    /**
-     * Handle alt text generation bulk action for media library
-     */
-    public static function handleAltTextBulkAction()
-    {
-        $mediaUpdated = 0;
-        $wpListTable = _get_list_table('WP_Media_List_Table');
-        $action = $wpListTable->current_action();
-
-        if ($action === 'auto_alt_text') {
-            // Recupera l'elenco degli ID dei media selezionati
-            $mediaIds = isset($_REQUEST['media']) ? $_REQUEST['media'] : array();
-
-            // Imposta l'alt text per ogni media selezionato
-            foreach ($mediaIds as $mediaId) {
-                $altText = self::altText($mediaId);
-                if (!empty($altText)) {
-                    update_post_meta($mediaId, '_wp_attachment_image_alt', $altText);
-                    $mediaUpdated++;
-                }
+        try {
+            // Stage 1: Generate image description using vision model
+            $vision_provider = new HuggingFaceVision();
+            
+            // Ensure vision model is set
+            $vision_model = get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_VISION_HUGGINGFACE_MODEL);
+            if (empty($vision_model)) {
+                update_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_VISION_HUGGINGFACE_MODEL, Constants::CONTEXTUAL_ALT_TEXT_HF_JOY_CAPTION_BETA);
+                DBLogger::make()->writeLog('info', 'Set default vision model to Joy Caption Beta One', [], $attachment_id);
             }
-
-            $callBackData = [
-                'mediaSelected' => count($mediaIds),
-                'mediaUpdated' => $mediaUpdated,
-                'auto_alt_text' => '1',
-            ];
-
-            // Redirect alla pagina della media library con un messaggio di successo
-            $sendback = add_query_arg(
-                $callBackData,
-                admin_url('upload.php')
-            );
-            wp_redirect($sendback);
-            exit();
-        }
-    }
-
-    /**
-     * Display a notice after alt text generation bulk action
-     */
-    public static function altTextBulkActionAdminNotice()
-    {
-        if (isset($_REQUEST['auto_alt_text'])) {
-            $mediaSelected = intval($_REQUEST['mediaSelected']);
-            $mediaUpdated = intval($_REQUEST['mediaUpdated']);
-
-            $errorLogDisclaimer = __('Take a look at the', 'auto-alt-text') . ' <a href="' . esc_url(menu_page_url(Constants::AATXT_PLUGIN_OPTION_LOG_PAGE_SLUG, false)) . '">' . __('error log', 'auto-alt-text') . '</a>.';
-
-            if ($mediaUpdated === 0) {
-                printf('<div id="message" class="notice notice-error is-dismissible"><p>' . esc_attr__('No Alt Text has been set.', 'auto-alt-text') . ' %s</p></div>', $errorLogDisclaimer);
-            } elseif ($mediaSelected === $mediaUpdated) {
-                /**
-                 * translators:
-                 * %s = number of images processed
-                 */
-                printf('<div id="message" class="updated notice is-dismissible"><p>' . esc_attr__('The Alt Text has been set for %s media.', 'auto-alt-text') . '</p></div>', $mediaUpdated);
-            } else {
-                /**
-                 * translators:
-                 *   %1$s = number of media items successfully updated
-                 *   %2$s = total number of media items selected
-                 *   %3$s = HTML disclaimer/link to the error log
-                 */
-                printf(
-                    '<div id="message" class="notice notice-warning is-dismissible"><p>%s</p></div>',
-                    sprintf(
-                    /* translators: 1 = updated count, 2 = selected count, 3 = disclaimer HTML */
-                        __( 'The Alt Text has been set for %1$s of %2$s media. %3$s', 'auto-alt-text' ),
-                        number_format_i18n( $mediaUpdated ),
-                        number_format_i18n( $mediaSelected ),
-                        wp_kses_post( $errorLogDisclaimer )
-                    )
-                );
+            
+            $image_description = $vision_provider->response($image_url);
+            
+            if (empty($image_description)) {
+                DBLogger::make()->writeLog('error', 'Failed to generate image description', [], $attachment_id);
+                return $metadata;
             }
-        }
-    }
-
-    /**
-     * Create a Logs table on plugin activation
-     */
-    public static function activatePlugin(): void
-    {
-        DBLogger::make()->createLogTable();
-    }
-
-    /**
-     * Drop Logs table on plugin deactivation
-     */
-    public static function deactivatePlugin(): void
-    {
-        DBLogger::make()->dropLogTable();
-    }
-
-    /**
-     * Add link to the options page of the plugin in the plugins listing
-     */
-    public static function settingsLink(array $links): array
-    {
-        $url = esc_url(add_query_arg(
-            'page',
-            'auto-alt-text-options',
-            get_admin_url() . 'admin.php'
-        ));
-        $settingsLink = "<a href='$url'>" . esc_html__('Settings', 'auto-alt-text') . '</a>';
-        $links[] = $settingsLink;
-
-        return $links;
-    }
-
-    /**
-     * Load text domain
-     * @return void
-     */
-    public static function loadTextDomain(): void
-    {
-        load_plugin_textdomain('auto-alt-text', false, AATXT_LANGUAGES_RELATIVE_PATH);
-    }
-
-    /**
-     * @param array<string> $allowedMimeTypes
-     */
-    private static function allowedMimeTypesList(array $allowedMimeTypes): string
-    {
-        return str_replace('image/', '' , implode(', ', $allowedMimeTypes));
-    }
-
-    /**
-     * @param int $postId
-     * @return string
-     */
-    public static function altText(int $postId): string
-    {
-        if (!wp_attachment_is_image($postId)) {
-            return '';
-        }
-
-        if (PluginOptions::preserveExistingAltText()) {
-            $altText = get_post_meta($postId, '_wp_attachment_image_alt', TRUE);
-
-            if (!empty($altText)) {
-                return $altText;
-            }
-        }
-
-        $mimeType = get_post_mime_type($postId);
-
-        switch (PluginOptions::typology()) {
-            case Constants::AATXT_OPTION_TYPOLOGY_CHOICE_AZURE:
-                if (!in_array($mimeType, Constants::AATXT_AZURE_ALLOWED_MIME_TYPES, true)) {
-                    $formats = self::allowedMimeTypesList(Constants::AATXT_AZURE_ALLOWED_MIME_TYPES);
-                    (DBLogger::make())->writeImageLog($postId, "You uploaded an unsupported image. Please make sure your image has of one the following formats: $formats");
-                    return '';
-                }
-                try {
-                    $altText = (AltTextGeneratorAi::make(AzureComputerVisionCaptionsResponse::make()))->altText($postId);
-                } catch (AzureException $e) {
-                    (DBLogger::make())->writeImageLog($postId, "Azure - " . $e->getMessage());
-                }
-                break;
-            case Constants::AATXT_OPTION_TYPOLOGY_CHOICE_OPENAI:
-                if (!in_array($mimeType, Constants::AATXT_OPENAI_ALLOWED_MIME_TYPES, true)) {
-                    $formats = self::allowedMimeTypesList(Constants::AATXT_OPENAI_ALLOWED_MIME_TYPES);
-                    (DBLogger::make())->writeImageLog($postId, "You uploaded an unsupported image. Please make sure your image has of one the following formats: $formats");
-                    return '';
-                }
-                try {
-                    $altText = (AltTextGeneratorAi::make(OpenAIVision::make()))->altText($postId);
-                } catch (OpenAIException $e) {
-                    //If vision model fails, try with a fallback model
-                    $errorMessage = "OpenAI - " . Constants::AATXT_OPENAI_VISION_MODEL . ' - ' . $e->getMessage();
-                    (DBLogger::make())->writeImageLog($postId, $errorMessage);
-                    try {
-                        $altText = (AltTextGeneratorAi::make(Fallback::make()))->altText($postId);
-                    } catch (OpenAIException $e) {
-                        $errorMessage = "OpenAI - " . $e->getMessage();
-                        (DBLogger::make())->writeImageLog($postId, $errorMessage);
-                    }
-                }
-                break;
-            case Constants::AATXT_OPTION_TYPOLOGY_CHOICE_ARTICLE_TITLE:
-                // If Article title is selected as alt text generating typology
-                $parentId = wp_get_post_parent_id($postId);
-                if ($parentId) {
-                    $altText = (AltTextGeneratorParentPostTitle::make())->altText($postId);
+            
+            DBLogger::make()->writeLog('success', 'Generated image description', ['description' => $image_description], $attachment_id);
+            
+            // Stage 2: Generate contextual alt text using text model
+            $context = $this->getImageContext($attachment_id);
+            
+            // Log context information for debugging
+            DBLogger::make()->writeLog('debug', 'Context information collected', [
+                'attachment_id' => $attachment_id,
+                'post_title' => $context['post_title'] ?? 'none',
+                'post_content_length' => isset($context['post_content']) ? strlen($context['post_content']) : 0,
+                'categories' => $context['categories'] ?? [],
+                'tags' => $context['tags'] ?? [],
+                'post_type' => $context['post_type'] ?? 'none'
+            ], $attachment_id);
+            
+            $final_alt_text = $image_description; // Default to image description
+            
+            // Check if contextual awareness is enabled and context is available
+            if (PluginOptions::is_contextual_awareness_enabled() && 
+                (!empty($context['post_title']) || !empty($context['post_content']))) {
+                $text_model = $this->getTextProvider();
+                if ($text_model) {
+                    $final_alt_text = $text_model->generateContextualAltText($image_description, $context);
+                    DBLogger::make()->writeLog('success', 'Generated contextual alt text', [
+                        'alt_text' => $final_alt_text,
+                        'context_available' => !empty($context['post_title']) || !empty($context['post_content'])
+                    ], $attachment_id);
                 } else {
-                    //If media has not a parent use the Attachment Title method as fallback
-                    $altText = (AltTextGeneratorAttachmentTitle::make())->altText($postId);
+                    DBLogger::make()->writeLog('warning', 'No text provider available, using image description', [], $attachment_id);
                 }
-                break;
-            case Constants::AATXT_OPTION_TYPOLOGY_CHOICE_ATTACHMENT_TITLE:
-                // If Attachment title is selected as alt text generating typology
-                $altText = (AltTextGeneratorAttachmentTitle::make())->altText($postId);
-                break;
-            default:
-                return '';
+            } else {
+                if (!PluginOptions::is_contextual_awareness_enabled()) {
+                    DBLogger::make()->writeLog('info', 'Contextual awareness disabled, using image description', [], $attachment_id);
+                } else {
+                    DBLogger::make()->writeLog('info', 'No context available, using image description', [], $attachment_id);
+                }
+            }
+            
+            // Save alt text
+            update_post_meta($attachment_id, '_wp_attachment_image_alt', $final_alt_text);
+            DBLogger::make()->writeLog('success', 'Alt text saved successfully', ['final_alt_text' => $final_alt_text], $attachment_id);
+            
+        } catch (\Exception $e) {
+            DBLogger::make()->writeLog('error', 'Exception during alt text generation: ' . $e->getMessage(), [], $attachment_id);
         }
 
-        return $altText ?? '';
+        return $metadata;
     }
 
     /**
-     * @param int $postId
+     * Backup method to generate alt text for new attachments
+     * Called when add_attachment or wp_insert_attachment hooks are triggered
+     *
+     * @param  int $attachment_id The attachment ID.
      * @return void
      */
-    public static function addAltText(int $postId): void
+    public function generateAltTextForNewAttachment($attachment_id)
     {
-        $altText = self::altText($postId);
-        if (empty($altText)) {
+        // Skip if plugin is disabled
+        if (!get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_ENABLE_PLUGIN, false)) {
             return;
         }
 
-        update_post_meta($postId, '_wp_attachment_image_alt', $altText);
+        // Skip if the attachment is not an image
+        if (!wp_attachment_is_image($attachment_id)) {
+            return;
+        }
+
+        // Skip if alt text already exists
+        $existing_alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        if (!empty($existing_alt)) {
+            return;
+        }
+
+        // Get current metadata and call main altText method
+        $metadata = wp_get_attachment_metadata($attachment_id);
+        if (empty($metadata)) {
+            $metadata = []; // Provide empty array if no metadata exists yet
+        }
+        
+        // Call the main altText method
+        $this->altText($metadata, $attachment_id);
+    }
+
+    /**
+     * Get the selected text provider based on user settings
+     *
+     * @return \ContextualAltText\App\AIProviders\AITextProviderInterface|null
+     */
+    private function getTextProvider(): ?object
+    {
+        // First check if text provider is set to HuggingFace
+        $text_provider = get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_TEXT_PROVIDER, '');
+        
+        if ($text_provider === Constants::CONTEXTUAL_ALT_TEXT_PROVIDER_HUGGINGFACE) {
+            // Get the specific model
+            $selected_model = get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_TEXT_HUGGINGFACE_MODEL, '');
+            
+            DBLogger::make()->writeLog('info', 'Text provider check', [
+                'text_provider' => $text_provider,
+                'selected_model' => $selected_model
+            ], null);
+            
+            // Support both specific models and generic HuggingFace setting
+            if ($selected_model === Constants::CONTEXTUAL_ALT_TEXT_HF_LLAMA31_8B ||
+                !empty($selected_model)) { // Allow any HuggingFace model
+                
+                try {
+                    $textProvider = new HuggingFaceText();
+                    DBLogger::make()->writeLog('success', 'Text provider created successfully', [
+                        'provider_class' => get_class($textProvider),
+                        'model' => $selected_model
+                    ], null);
+                    return $textProvider;
+                } catch (\Exception $e) {
+                    DBLogger::make()->writeLog('error', 'Failed to create text provider', [
+                        'error' => $e->getMessage(),
+                        'model' => $selected_model
+                    ], null);
+                    return null;
+                }
+            } else {
+                // If no model is set, default to Llama 3.1 8B
+                update_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_TEXT_HUGGINGFACE_MODEL, Constants::CONTEXTUAL_ALT_TEXT_HF_LLAMA31_8B);
+                DBLogger::make()->writeLog('info', 'Auto-set text model to Llama 3.1 8B', [], null);
+                
+                try {
+                    return new HuggingFaceText();
+                } catch (\Exception $e) {
+                    DBLogger::make()->writeLog('error', 'Failed to create default text provider', [
+                        'error' => $e->getMessage()
+                    ], null);
+                    return null;
+                }
+            }
+        }
+        
+        DBLogger::make()->writeLog('warning', 'No valid text provider configured', [
+            'text_provider' => $text_provider
+        ], null);
+        return null;
+    }
+
+    /**
+     * Get context information from the current post/page for the given attachment
+     * Made public for testing purposes
+     *
+     * @param  int $attachment_id
+     * @return array
+     */
+    public function getImageContext(int $attachment_id): array
+    {
+        $context = [
+            'post_title' => '',
+            'post_content' => '',
+            'post_type' => '',
+            'categories' => [],
+            'tags' => [],
+            'surrounding_text' => ''
+        ];
+
+        // Try to get context from the post the image is attached to
+        $post = get_post($attachment_id);
+        if ($post && $post->post_parent) {
+            $parent_post = get_post($post->post_parent);
+            if ($parent_post) {
+                $context['post_title'] = $parent_post->post_title;
+                $context['post_content'] = $parent_post->post_content;
+                $context['post_type'] = $parent_post->post_type;
+                
+                $categories = get_the_category($parent_post->ID);
+                if ($categories) {
+                    $context['categories'] = wp_list_pluck($categories, 'name');
+                }
+                
+                $tags = get_the_tags($parent_post->ID);
+                if ($tags) {
+                    $context['tags'] = wp_list_pluck($tags, 'name');
+                }
+                
+                // Try to extract surrounding text context from image caption or description
+                if (!empty($post->post_excerpt)) {
+                    $context['surrounding_text'] = $post->post_excerpt;
+                } elseif (!empty($post->post_content)) {
+                    $context['surrounding_text'] = wp_strip_all_tags($post->post_content);
+                }
+            }
+        }
+
+        // If no parent post, try to get context from current page/post being edited
+        if (empty($context['post_title']) && isset($_POST['post_ID'])) {
+            $current_post = get_post(intval($_POST['post_ID']));
+            if ($current_post) {
+                $context['post_title'] = $current_post->post_title;
+                $context['post_content'] = $current_post->post_content;
+                $context['post_type'] = $current_post->post_type;
+                
+                $categories = get_the_category($current_post->ID);
+                if ($categories) {
+                    $context['categories'] = wp_list_pluck($categories, 'name');
+                }
+                
+                $tags = get_the_tags($current_post->ID);
+                if ($tags) {
+                    $context['tags'] = wp_list_pluck($tags, 'name');
+                }
+            }
+        }
+
+        // Also check for modern Block Editor context (for Gutenberg)
+        if (empty($context['post_title']) && isset($_SERVER['HTTP_REFERER'])) {
+            $referer = $_SERVER['HTTP_REFERER'];
+            if (preg_match('/[?&]post=(\d+)/', $referer, $matches)) {
+                $post_id = intval($matches[1]);
+                $current_post = get_post($post_id);
+                if ($current_post) {
+                    $context['post_title'] = $current_post->post_title;
+                    $context['post_content'] = $current_post->post_content;
+                    $context['post_type'] = $current_post->post_type;
+                    
+                    $categories = get_the_category($current_post->ID);
+                    if ($categories) {
+                        $context['categories'] = wp_list_pluck($categories, 'name');
+                    }
+                    
+                    $tags = get_the_tags($current_post->ID);
+                    if ($tags) {
+                        $context['tags'] = wp_list_pluck($tags, 'name');
+                    }
+                }
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Handle block editor upload via AJAX
+     */
+    public function handleBlockEditorUpload()
+    {
+        // This hook runs early in the upload process
+        // We'll use a different approach - schedule the alt text generation
+        add_action('shutdown', [$this, 'processRecentUploads']);
+    }
+
+    /**
+     * Handle REST API uploads (used by block editor)
+     */
+    public function handleRestApiUpload($attachment, $request, $creating)
+    {
+        if (!$creating || !wp_attachment_is_image($attachment->ID)) {
+            return;
+        }
+
+        DBLogger::make()->writeLog('info', 'REST API upload detected', [
+            'attachment_id' => $attachment->ID,
+            'attachment_title' => $attachment->post_title
+        ], $attachment->ID);
+
+        // Schedule alt text generation with a slight delay to ensure metadata is ready
+        wp_schedule_single_event(time() + 5, 'contextual_alt_text_generate', [$attachment->ID]);
+    }
+
+    /**
+     * Ensure alt text is generated after metadata update
+     */
+    public function ensureAltTextAfterUpload($metadata, $attachment_id)
+    {
+        // Skip if plugin is disabled
+        if (!get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_ENABLE_PLUGIN, false)) {
+            return $metadata;
+        }
+
+        // Skip if the attachment is not an image
+        if (!wp_attachment_is_image($attachment_id)) {
+            return $metadata;
+        }
+
+        // Check if alt text already exists
+        $existing_alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        if (!empty($existing_alt)) {
+            return $metadata;
+        }
+
+        DBLogger::make()->writeLog('info', 'Metadata update detected, ensuring alt text generation', [
+            'attachment_id' => $attachment_id
+        ], $attachment_id);
+
+        // Generate alt text asynchronously to avoid blocking the upload
+        wp_schedule_single_event(time() + 2, 'contextual_alt_text_generate', [$attachment_id]);
+
+        return $metadata;
+    }
+
+    /**
+     * Process recent uploads for alt text generation
+     */
+    public function processRecentUploads()
+    {
+        // Skip if plugin is disabled
+        if (!get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_ENABLE_PLUGIN, false)) {
+            return;
+        }
+
+        // Get recent uploads from the last 5 minutes without alt text
+        $recent_uploads = get_posts([
+            'post_type' => 'attachment',
+            'post_mime_type' => 'image',
+            'meta_query' => [
+                [
+                    'key' => '_wp_attachment_image_alt',
+                    'compare' => 'NOT EXISTS'
+                ]
+            ],
+            'date_query' => [
+                [
+                    'after' => '5 minutes ago'
+                ]
+            ],
+            'posts_per_page' => 10,
+            'orderby' => 'date',
+            'order' => 'DESC'
+        ]);
+
+        foreach ($recent_uploads as $upload) {
+            DBLogger::make()->writeLog('info', 'Processing recent upload for alt text', [
+                'attachment_id' => $upload->ID
+            ], $upload->ID);
+
+                         // Schedule alt text generation
+             wp_schedule_single_event(time() + 1, 'contextual_alt_text_generate', [$upload->ID]);
+         }
+     }
+
+    /**
+     * Handle scheduled alt text generation
+     */
+    public function scheduledAltTextGeneration($attachment_id)
+    {
+        DBLogger::make()->writeLog('info', 'Scheduled alt text generation triggered', [
+            'attachment_id' => $attachment_id
+        ], $attachment_id);
+
+        // Skip if plugin is disabled
+        if (!get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_ENABLE_PLUGIN, false)) {
+            DBLogger::make()->writeLog('warning', 'Plugin disabled, skipping scheduled generation', [], $attachment_id);
+            return;
+        }
+
+        // Skip if the attachment is not an image
+        if (!wp_attachment_is_image($attachment_id)) {
+            DBLogger::make()->writeLog('info', 'Not an image, skipping scheduled generation', [], $attachment_id);
+            return;
+        }
+
+        // Check if alt text already exists
+        $existing_alt = get_post_meta($attachment_id, '_wp_attachment_image_alt', true);
+        if (!empty($existing_alt)) {
+            DBLogger::make()->writeLog('info', 'Alt text already exists, skipping scheduled generation', [], $attachment_id);
+            return;
+        }
+
+        // Get metadata and generate alt text
+        $metadata = wp_get_attachment_metadata($attachment_id);
+        if (empty($metadata)) {
+            $metadata = [];
+        }
+
+        DBLogger::make()->writeLog('info', 'Starting scheduled alt text generation', [
+            'attachment_id' => $attachment_id
+        ], $attachment_id);
+
+        try {
+            $this->altText($metadata, $attachment_id);
+        } catch (\Exception $e) {
+            DBLogger::make()->writeLog('error', 'Scheduled alt text generation failed: ' . $e->getMessage(), [
+                'attachment_id' => $attachment_id
+            ], $attachment_id);
+        }
     }
 }

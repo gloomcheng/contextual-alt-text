@@ -1,10 +1,10 @@
 <?php
 
-namespace AATXT\App\Admin;
+namespace ContextualAltText\App\Admin;
 
-use AATXT\App\Setup;
-use AATXT\App\Utilities\AssetsManager;
-use AATXT\Config\Constants;
+use ContextualAltText\App\Setup;
+use ContextualAltText\App\Utilities\AssetsManager;
+use ContextualAltText\Config\Constants;
 
 class MediaLibrary
 {
@@ -41,9 +41,9 @@ class MediaLibrary
 
         // Load script in Media Library and in any post editing/modal (all CPTs)
         if (! $screen || in_array($screen->base, ['upload', 'post'], true)) {
-            $mediaLibraryJs = self::$assetsManager->getAssetUrl('resources/js/media-library.js', false);
+            $mediaLibraryJs = self::$assetsManager->getAssetUrl('assets/js/media-library.js', false);
             wp_enqueue_script(
-                Constants::AATXT_PLUGIN_MEDIA_LIBRARY_HANDLE,
+                Constants::CONTEXTUAL_ALT_TEXT_PLUGIN_MEDIA_LIBRARY_HANDLE,
                 $mediaLibraryJs,
                 ['jquery'],
                 false,
@@ -51,10 +51,10 @@ class MediaLibrary
             );
 
             wp_localize_script(
-                Constants::AATXT_PLUGIN_MEDIA_LIBRARY_HANDLE,
-                'AATXT',
+                Constants::CONTEXTUAL_ALT_TEXT_PLUGIN_MEDIA_LIBRARY_HANDLE,
+                'CONTEXTUAL_ALT_TEXT',
                 [
-                    'altTextNonce' => wp_create_nonce(Constants::AATXT_AJAX_GENERATE_ALT_TEXT_NONCE),
+                    'altTextNonce' => wp_create_nonce(Constants::CONTEXTUAL_ALT_TEXT_AJAX_GENERATE_ALT_TEXT_NONCE),
                     'ajaxUrl'      => admin_url('admin-ajax.php'),
                 ]
             );
@@ -64,10 +64,10 @@ class MediaLibrary
     public function renderGenerateButtonTemplate(): void
     {
         ?>
-        <script type="text/html" id="tmpl-aatxt-generate-alt-text">
+        <script type="text/html" id="tmpl-contextual-alt-text-generate-alt-text">
             <# if ( data.type === 'image' ) { #>
-            <button class="button aatxt-generate-alt-text" data-post-id="{{ data.id }}">
-                <?php esc_html_e('Generate Alt Text', 'auto-alt-text'); ?>
+            <button class="button contextual-alt-text-generate-alt-text" data-post-id="{{ data.id }}">
+                <?php esc_html_e('Generate Alt Text', 'contextual-alt-text'); ?>
             </button>
             <span class="spinner"></span>
             <# } #>
@@ -85,14 +85,16 @@ class MediaLibrary
         $mimeType = get_post_mime_type($post->ID);
         $altTextGenerationTypology = PluginOptions::typology();
 
-        if ($altTextGenerationTypology === Constants::AATXT_OPTION_TYPOLOGY_CHOICE_OPENAI
-            && ! in_array($mimeType, Constants::AATXT_OPENAI_ALLOWED_MIME_TYPES, true)
+        if (
+            $altTextGenerationTypology === Constants::CONTEXTUAL_ALT_TEXT_OPTION_TYPOLOGY_CHOICE_OPENAI
+            && ! in_array($mimeType, Constants::CONTEXTUAL_ALT_TEXT_OPENAI_ALLOWED_MIME_TYPES, true)
         ) {
             return $form_fields;
         }
 
-        if ($altTextGenerationTypology === Constants::AATXT_OPTION_TYPOLOGY_CHOICE_AZURE
-            && ! in_array($mimeType, Constants::AATXT_AZURE_ALLOWED_MIME_TYPES, true)
+        if (
+            $altTextGenerationTypology === Constants::CONTEXTUAL_ALT_TEXT_OPTION_TYPOLOGY_CHOICE_AZURE
+            && ! in_array($mimeType, Constants::CONTEXTUAL_ALT_TEXT_AZURE_ALLOWED_MIME_TYPES, true)
         ) {
             return $form_fields;
         }
@@ -101,7 +103,7 @@ class MediaLibrary
             'label' => get_post_mime_type($post->ID),
             'input' => 'html',
             'html'  => '<button type="button" class="button" id="generate-alt-text-button" data-post-id="' . $post->ID . '">'
-                . esc_html__('Generate Alt Text', 'auto-alt-text') .
+                . esc_html__('Generate Alt Text', 'contextual-alt-text') .
                 '</button><span id="loading-spinner" class="spinner" style="float:none; margin-left:5px; display:none;"></span>',
             'helps' => '',
         ];
@@ -111,7 +113,7 @@ class MediaLibrary
 
     public function generateAltText(): void
     {
-        check_ajax_referer(Constants::AATXT_AJAX_GENERATE_ALT_TEXT_NONCE, 'nonce');
+        check_ajax_referer(Constants::CONTEXTUAL_ALT_TEXT_AJAX_GENERATE_ALT_TEXT_NONCE, 'nonce');
 
         $postId = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
         if (! $postId) {
@@ -125,7 +127,19 @@ class MediaLibrary
             return;
         }
 
-        $generatedAltText = Setup::altText($postId);
+        // Call the altText method of the Setup instance
+        $setup = Setup::getInstance();
+        $metadata = wp_get_attachment_metadata($postId);
+        $setup->altText($metadata, $postId);
+        
+        // Get the generated alt text
+        $generatedAltText = get_post_meta($postId, '_wp_attachment_image_alt', true);
+        
+        if (empty($generatedAltText)) {
+            wp_send_json_error('Failed to generate alt text');
+            return;
+        }
+        
         wp_send_json_success(['alt_text' => $generatedAltText]);
     }
 }

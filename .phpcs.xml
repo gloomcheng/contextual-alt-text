@@ -1,0 +1,132 @@
+<?xml version="1.0"?>
+<ruleset name="Contextual Alt Text Coding Standards">
+    <description>Coding standards for Contextual Alt Text WordPress Plugin</description>
+
+    <!-- Base standards -->
+    <rule ref="PSR12"/>
+    <exclude name="Generic.Files.LineLength"/>
+
+    <!-- Use spaces instead of tabs (4 spaces) -->
+    <rule ref="Generic.WhiteSpace.DisallowTabIndent"/>
+    <rule ref="Generic.WhiteSpace.ScopeIndent">
+        <properties>
+            <property name="indent" value="4"/>
+            <property name="tabIndent" value="false"/>
+        </properties>
+    </rule>
+
+    <!-- Allow modern PHP features -->
+    <rule ref="Generic.PHP.RequireStrictTypes">
+        <severity>0</severity>
+    </rule>
+
+    <!-- WordPress specific configurations -->
+    <rule ref="WordPress.Security.EscapeOutput">
+        <exclude-pattern>*/src/App/AIProviders/*/*</exclude-pattern>
+        <exclude-pattern>*/src/App/Logging/*</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Security.NonceVerification">
+        <exclude-pattern>*/src/App/AIProviders/OpenAI/OpenAIResponse.php</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.Security.ValidatedSanitizedInput">
+        <exclude-pattern>*/src/App/AIProviders/OpenAI/OpenAIResponse.php</exclude-pattern>
+    </rule>
+    <rule ref="WordPress.WP.I18n">
+        <properties>
+            <property name="text_domain" type="array">
+                <element value="contextual-alt-text"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Allow short array syntax -->
+    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+
+    <!-- WordPress function prefixes -->
+    <rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+        <properties>
+            <property name="prefixes" type="array">
+                <element value="ContextualAltText"/>
+                <element value="CONTEXTUAL_ALT_TEXT"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Exclude WordPress hooks and functions from undefined function errors -->
+    <rule ref="WordPress.WP.GlobalVariablesOverride"/>
+    <rule ref="WordPress.WP.DiscouragedFunctions">
+        <properties>
+            <property name="exclude" type="array">
+                <element value="wp_get_attachment_url"/>
+                <element value="wp_get_attachment_image_alt"/>
+                <element value="update_post_meta"/>
+                <element value="get_post_meta"/>
+                <element value="wp_attachment_is_image"/>
+                <element value="get_post_mime_type"/>
+                <element value="wp_get_post_parent_id"/>
+                <element value="add_action"/>
+                <element value="add_filter"/>
+                <element value="register_activation_hook"/>
+                <element value="register_deactivation_hook"/>
+                <element value="load_plugin_textdomain"/>
+                <element value="plugin_dir_url"/>
+                <element value="plugin_basename"/>
+                <element value="_get_list_table"/>
+                <element value="admin_url"/>
+                <element value="wp_redirect"/>
+                <element value="add_query_arg"/>
+                <element value="menu_page_url"/>
+                <element value="esc_url"/>
+                <element value="esc_attr"/>
+                <element value="esc_html"/>
+                <element value="esc_html__"/>
+                <element value="esc_attr__"/>
+                <element value="esc_textarea"/>
+                <element value="sanitize_url"/>
+                <element value="sanitize_text_field"/>
+                <element value="sanitize_textarea_field"/>
+                <element value="wp_kses_post"/>
+                <element value="number_format_i18n"/>
+                <element value="checked"/>
+                <element value="selected"/>
+                <element value="current_user_can"/>
+                <element value="is_admin"/>
+                <element value="get_current_screen"/>
+                <element value="wp_enqueue_script"/>
+                <element value="wp_enqueue_style"/>
+                <element value="add_menu_page"/>
+                <element value="add_submenu_page"/>
+                <element value="register_setting"/>
+                <element value="settings_fields"/>
+                <element value="submit_button"/>
+                <element value="get_option"/>
+                <element value="update_option"/>
+            </property>
+        </properties>
+    </rule>
+
+    <!-- Configure files and directories to check -->
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg name="parallel" value="8"/>
+    <arg value="sp"/>
+
+    <!-- What to scan -->
+    <file>.</file>
+
+    <!-- Exclude patterns -->
+    <exclude-pattern>/vendor/</exclude-pattern>
+    <exclude-pattern>/node_modules/</exclude-pattern>
+    <exclude-pattern>/.git/</exclude-pattern>
+    <exclude-pattern>/assets/</exclude-pattern>
+    <exclude-pattern>/languages/</exclude-pattern>
+
+    <!-- Show progress -->
+    <arg name="report" value="full"/>
+    <arg name="cache" value=".phpcs-cache"/>
+
+    <!-- Minimum PHP version -->
+    <config name="minimum_wp_version" value="6.0"/>
+    <config name="testVersion" value="7.4-"/>
+
+</ruleset>

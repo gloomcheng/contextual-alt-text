@@ -1,8 +1,8 @@
 <?php
 
-namespace AATXT\App\Utilities;
+namespace ContextualAltText\App\Utilities;
 
-use AATXT\Config\Constants;
+use ContextualAltText\Config\Constants;
 use RuntimeException;
 
 final class Encryption
@@ -25,7 +25,39 @@ final class Encryption
     }
 
     /**
-     * @param string $value
+     * Static wrapper for encrypt method used in WordPress sanitize callbacks
+     *
+     * @param  string $value
+     * @return string
+     */
+    public static function encryptStatic(string $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        $instance = self::make();
+        return $instance->encrypt($value);
+    }
+
+    /**
+     * Static wrapper for decrypt method
+     *
+     * @param  string $value
+     * @return string
+     */
+    public static function decryptStatic(string $value): string
+    {
+        if (empty($value)) {
+            return '';
+        }
+
+        $instance = self::make();
+        return $instance->decrypt($value);
+    }
+
+    /**
+     * @param  string $value
      * @return string|bool
      */
     public function encrypt(string $value): string
@@ -70,7 +102,8 @@ final class Encryption
 
     /**
      * Decrypts a raw value trying with the plugin key and salt first, then falling back to the logged-in key and salt.
-     * @param string $rawValue
+     *
+     * @param  string $rawValue
      * @return string
      */
     public function decrypt(string $rawValue): string
@@ -101,8 +134,8 @@ final class Encryption
 
     private function getKey(): string
     {
-        if ( defined( 'AATXT_ENCRYPTION_KEY' ) && '' !== AATXT_ENCRYPTION_KEY ) {
-            return AATXT_ENCRYPTION_KEY;
+        if (defined('CONTEXTUAL_ALT_TEXT_ENCRYPTION_KEY') && '' !== CONTEXTUAL_ALT_TEXT_ENCRYPTION_KEY) {
+            return CONTEXTUAL_ALT_TEXT_ENCRYPTION_KEY;
         }
         // If the constant is not defined, use the WordPress constants LOGGED_IN_KEY and LOGGED_IN_SALT
         if (defined('LOGGED_IN_KEY') && '' !== LOGGED_IN_KEY) {
@@ -115,8 +148,8 @@ final class Encryption
 
     public function getSalt(): string
     {
-        if ( defined( 'AATXT_ENCRYPTION_SALT' ) && '' !== AATXT_ENCRYPTION_SALT ) {
-            return AATXT_ENCRYPTION_SALT;
+        if (defined('CONTEXTUAL_ALT_TEXT_ENCRYPTION_SALT') && '' !== CONTEXTUAL_ALT_TEXT_ENCRYPTION_SALT) {
+            return CONTEXTUAL_ALT_TEXT_ENCRYPTION_SALT;
         }
         // If the constant is not defined, use the WordPress constants LOGGED_IN_KEY and LOGGED_IN_SALT
         if (defined('LOGGED_IN_SALT') && '' !== LOGGED_IN_SALT) {
@@ -134,9 +167,9 @@ final class Encryption
     public function migrateLegacyApiKeys(): void
     {
         $fields = [
-            Constants::AATXT_OPTION_FIELD_API_KEY_OPENAI,
-            Constants::AATXT_OPTION_FIELD_API_KEY_AZURE_COMPUTER_VISION,
-            Constants::AATXT_OPTION_FIELD_API_KEY_AZURE_TRANSLATE_INSTANCE,
+            Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_API_KEY_OPENAI,
+            Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_API_KEY_AZURE_COMPUTER_VISION,
+            Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_API_KEY_AZURE_TRANSLATE_INSTANCE,
         ];
 
         foreach ($fields as $optionName) {

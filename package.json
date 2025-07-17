@@ -1,20 +1,22 @@
 {
-  "name": "auto-alt-text",
-  "version": "2.4.2",
+  "name": "contextual-alt-text",
+  "description": "Automatically generate context-aware alt text for images using various AI providers, including Hugging Face. Generates descriptions based on image content and the surrounding post/page context.",
+  "version": "2.4.3",
   "type": "module",
-  "scripts": {
-    "build": "npx vite build",
-    "dev": "npx vite dev"
+  "author": {
+    "name": "Fuyuan Cheng",
+    "url": "https://github.com/gloomcheng"
   },
-  "devDependencies": {
-    "postcss-custom-properties": "^13.3.2",
-    "postcss-nested": "^6.0.1",
-    "vite-plugin-manifest": "^0.0.1"
+  "contributors": [
+    {
+      "name": "Valerio Monti",
+      "email": "valerio.monti@vmweb.it",
+      "url": "https://www.vmweb.it"
+    }
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gloomcheng/contextual-alt-text.git"
   },
-  "dependencies": {
-    "vite": "^6.3.5"
-  },
-  "volta": {
-    "node": "18.19.0"
-  }
+  "license": "GPL-3.0-or-later"
 }

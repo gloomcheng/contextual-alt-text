@@ -1,6 +1,6 @@
 <?php
 
-namespace AATXT\App\AIProviders;
+namespace ContextualAltText\App\AIProviders;
 
 interface AITranslatorInterface
 {

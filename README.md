@@ -1,93 +1,283 @@
-# Auto Alt Text
-This WordPress plugin allows you to automatically generate an Alt Text for images uploaded into the media library.
-This plugin is able to use the AI of external services of OpenaAI or Azure to generate an alt text that is as faithful as possible to the content of the image.
+# Contextual Alt Text
 
-## Features
+> **Fork Notice:** This is a fork of the original "Auto Alt Text" WordPress plugin by [Valerio Monti](https://www.vmweb.it).
+>
+> - **Original Repository:** https://github.com/valeriomonti/auto-alt-text
+> - **Fork Maintainer:** [Fuyuan Cheng](https://github.com/gloomcheng)
+> - **Current Version:** 3.0.0 (fork version)
+> - **License:** GPL v3 (unchanged)
+>
+> This fork maintains full compatibility with the original plugin while preserving all original author attributions as required by GPL v3.
 
-This plugin allows you to generate alt texts in the following ways:
-- using Openai APIs (GPT-4o, GPT-4o Mini, o1 Mini)
-- using Azure APIs for computational vision;
-- recovering the title of the image
-- recovering the title of the article in which the image is uploaded
+This advanced WordPress plugin automatically generates Alt Text for images uploaded to your media library using cutting-edge AI technology. Choose from multiple AI providers including OpenAI, Azure, and HuggingFace for cost-effective, multilingual alt text generation with full contextual awareness.
 
-## Prerequisites
-Please ensure you have the following tools installed:
-- PHP version: >= 7.4
-- composer
-- node version: 18
-- npm
+## ✨ New Features in v3.0.0
 
-## Getting started
-Within your WordPress installation, navigate to the plugin directory and run the following commands:
+### 🚀 Advanced HuggingFace AI Integration
+
+- **Joy Caption Beta One**: State-of-the-art vision model for superior image analysis
+- **Llama 3.1 8B**: Advanced text model for contextual alt text refinement
+- **Two-Stage Processing**: Vision model analyzes image → Text model creates contextual description
+- **Cost-Effective**: Free and affordable alternative to OpenAI/Azure
+- **Multi-language Generation**: Direct generation in target language without translation
+
+### 🧠 Enhanced Contextual Awareness
+
+- **Smart Context Analysis**: Automatically considers post title, content, categories, and tags
+- **Relevance-Focused**: Alt text reflects the actual context of where the image appears
+- **Team Introduction Example**: For a team page, describes images in relation to team context
+- **SEO Optimized**: Better search engine relevance through contextual descriptions
+
+### 🔧 Bulk Generator Tool
+
+- **Post-Based Processing**: Generate alt text for all images in a specific post
+- **Force Regenerate**: Option to override existing alt text
+- **Real-time Progress**: Visual progress tracking with detailed logs
+- **Asynchronous Processing**: Prevents timeouts for large image sets
+- **Context-Aware**: Uses post content for all images in that post
+
+### 🌍 Enhanced Multilingual Support
+
+- **15+ Languages**: Including Traditional Chinese, Simplified Chinese, Japanese, Korean, and European languages
+- **Direct Generation**: AI generates alt text directly in target language (no translation needed)
+- **Length Limitations**: Automatic character limits (50 for CJK languages, 120 for others)
+- **Complete Localization**: Full Traditional Chinese (zh_TW) interface
+
+### ⚙️ Advanced Configuration
+
+- **Flexible Providers**: Separate Text and Vision model configurations
+- **Multiple API Keys**: Individual management for different providers
+- **Smart Detection**: Context awareness from post editor, media library, and bulk generator
+- **Auto-Cleanup**: Removes AI-generated formatting prefixes and quotes automatically
+
+## 🎯 Features
+
+This plugin supports multiple alt text generation methods:
+
+### AI-Powered Methods
+
+- **HuggingFace APIs** (Joy Caption Beta One + Llama 3.1) - Advanced contextual analysis (Recommended)
+- **OpenAI APIs** (GPT-4o, GPT-4o Mini, o1 Mini) - Premium AI vision models
+- **Azure Computer Vision** - Enterprise-grade image analysis with translation support
+
+### Non-AI Methods
+
+- **Article Title** - Uses the title of the article containing the image
+- **Attachment Title** - Uses the filename/title of the image itself
+
+## 🛠️ Prerequisites
+
+- **PHP**: >= 7.4
+- **WordPress**: >= 6.0
+- **Node.js**: 18+ (for development)
+- **Composer**: For dependency management
+- **npm**: For asset building (development)
+
+## 🚀 Installation
+
+### For WordPress Users
+
+1. **Download the plugin** from GitHub releases
+2. **Upload to WordPress:**
+   - Go to WordPress Admin → Plugins → Add New → Upload Plugin
+   - Choose the zip file and install
+3. **Activate the plugin** in WordPress admin
+4. **Configure** in Settings → Contextual Alt Text Options
+
+### For Developers
+
+1. **Clone the repository:**
 
 ```bash
-git clone git@github.com:valeriomonti/auto-alt-text.git
-cd auto-alt-text
+git clone git@github.com:gloomcheng/contextual-alt-text.git
+cd contextual-alt-text
+```
+
+2. **Install dependencies:**
+
+```bash
 composer install
 npm install
 npm run build
 ```
-In the wp-admin panel activate the Auto Alt Text plugin.
 
-The plugin settings are found in the Settings -> Auto Alt Text Options menu.
+3. **Copy to WordPress:**
+   - Copy the entire folder to `/wp-content/plugins/contextual-alt-text/`
+   - Activate in WordPress admin
 
-After installing the plugin, click on the 'Auto Alt Text' menu item and select the Generation Method you prefer.
+## 🔧 Configuration
 
-### OpenAI's APIs
-In your OpenAI account, retrieve the following data to enter on the options page:
-- API Key
+### HuggingFace Setup (Recommended)
 
-Enter a prompt for generating the alt text according to your needs.
+1. Visit [HuggingFace](https://huggingface.co/settings/tokens)
+2. Sign up for a free account
+3. Create a new access token with "Read" permission
+4. Enter the token in plugin settings
+5. Select "Joy Caption Beta One" for vision model
+6. Select "Llama 3.1 8B" for text model
 
-### Azure's APIs method
-On your Azure account, create a Computer Vision instance and retrieve the following data to enter on the options page:
-- Computer Vision API Key
-- Computer Vision Endpoint
+### OpenAI Setup
 
-If you want to generate an alt text in English, save the options without filling in any other fields.
+1. Visit [OpenAI API](https://platform.openai.com/api-keys)
+2. Create an account and add billing information
+3. Generate an API key
+4. Enter the key in plugin settings
 
-If you want to generate an alt text in a different language, on your Azure account, create a Translator instance and retrieve the following data to enter on the options page:
-- Translator Instance API Key
-- Translator Instance Endpoint
-- Translator Instance Region
+### Azure Computer Vision Setup
 
-After entering this data, save the options.
+1. Create an Azure account and Computer Vision resource
+2. Get your API key and endpoint
+3. Optionally set up Azure Translator for multilingual support
+4. Configure in plugin settings
 
-Select the desired language and save the options again.
+## 💡 How It Works
 
-### Title of the article method
-For this generation method, there are no options to set as the alt text will be generated by copying the title of the article in which the image is uploaded.
+### Two-Stage AI Processing (HuggingFace)
 
-In case the article is not uploaded as an attachment of an article, the "Title of the attachment" method will be used as a fallback.
+1. **Vision Analysis**: Joy Caption Beta One analyzes the image content
+2. **Contextual Refinement**: Llama 3.1 combines image description with post context
+3. **Smart Output**: Generates alt text relevant to both image and surrounding content
+4. **Auto-Cleanup**: Removes formatting prefixes and ensures clean output
 
-### Title of the attachment method
-For this generation method, there are no options to set as the alt text will be generated by copying the title of the image.
+### Automatic Generation
 
-## Functioning
-Once the plugin is configured, each time an image is uploaded to the media library, an alt text will be automatically set based on the selected generation method.
+Once configured, alt text is automatically generated when uploading images. The AI considers:
 
-For images already in the media library, you can create bulk alt texts. Open the Media Library in the "list" view, select the images for which to generate the alt text, and choose the "Generate alt text" bulk action. (Depending on the number of images chosen and their weight, this may take some time.)
+- **Image Content**: Visual analysis of the actual image
+- **Post Context**: Title, content, categories, and tags of the containing post
+- **Language Preference**: Direct generation in your selected language
+- **Character Limits**: Automatic length optimization
 
-You can also generate the alt text of a single image directly from the media library. Open the Media Library in “grid” mode, choose the image for which to generate the alt text, and click the “Generate alt text” button. In no time the alt text field will be overwritten by the generated description.
+### Bulk Generation
 
-**Notice**: If you choose one of the methods that involves the use of external APIs, the upload times for images in the media library might increase because it requires sending a request to the APIs, waiting for the external server to process, and waiting for a response.
+For existing images:
 
-In case of an error in the API call, the image will still be uploaded but without alt text as usual. In this case, the cause of the error can be seen on the Auto Alt Text -> Error log page.
+1. **Go to Contextual Alt Text → Bulk Generator**
+2. **Enter Post ID** you want to process
+3. **Choose Force Regenerate** to override existing alt text (optional)
+4. **Click "Start Processing"**
+5. **Monitor Progress** in real-time with detailed logs
 
-### Logging
-If the generation of the alt text via AI is set, in case of errors, to avoid blocking the editorial work, the image is loaded anyway but without the alt text being compiled.
+### Individual Generation
 
-When a call to the Azure or OpenAI API fails, a record containing the error message is saved in a custom database table.
-In this case, the cause of the error can be seen on the Auto Alt Text -> Error log page.
+For single images:
 
-### Encryption Constants
+1. Open Media Library (grid view)
+2. Select an image
+3. Click "Generate alt text" button
+4. Alt text updates instantly
 
-We **strongly recommend** defining the new plugin-specific constants in your `wp-config.php`:
+## 🌐 Language Support
 
-`define( 'AAT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );`
-`define( 'AAT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );`
+The plugin supports direct alt text generation in 15+ languages:
 
-You will find these two define(...) lines already generated for you on the Auto Alt Text » Options page – simply copy & paste them before the `/* That's all, stop editing! Happy publishing. */` line in your `wp-config.php`.
+- **English** (en)
+- **Traditional Chinese** (zh-tw) 繁體中文
+- **Simplified Chinese** (zh) 简体中文
+- **Japanese** (ja) 日本語
+- **Korean** (ko) 한국어
+- **Spanish** (es)
+- **French** (fr)
+- **German** (de)
+- **Italian** (it)
+- **Portuguese** (pt)
+- **Russian** (ru)
+- **Arabic** (ar)
+- **Hindi** (hi)
+- **Thai** (th)
+- **Vietnamese** (vi)
 
-If you choose not to add them, the plugin will continue to work normally, but it will fall back to using your WordPress `LOGGED_IN_KEY` / `LOGGED_IN_SALT`, which may break if those salts are ever changed.
+### Character Limits
 
+- **CJK Languages** (Chinese, Japanese, Korean): 50 characters
+- **Other Languages**: 120 characters
+
+## 🔒 Security & Encryption
+
+### Enhanced API Key Protection
+
+We strongly recommend defining plugin-specific encryption constants in your `wp-config.php`:
+
+```php
+define( 'CONTEXTUAL_ALT_TEXT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );
+define( 'CONTEXTUAL_ALT_TEXT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );
+```
+
+These constants ensure your API keys are securely encrypted in the database. Without these constants, the plugin will use WordPress default encryption which may be less secure.
+
+## 📊 Debug Logging
+
+The plugin includes comprehensive debug logging:
+
+- **Debug Logs**: View detailed processing logs in Contextual Alt Text → Debug Logs
+- **Context Tracking**: See what context information is collected for each image
+- **API Responses**: Monitor API calls and responses
+- **Error Handling**: Failed API calls are logged with full details
+- **No Disruption**: Images upload successfully even if alt text generation fails
+
+## ⚠️ Important Notes
+
+### Performance Considerations
+
+- **Two-Stage Processing**: May take longer but provides higher quality results
+- **API Methods**: Upload times may increase due to external API calls
+- **Timeout Protection**: Asynchronous processing prevents WordPress timeouts
+- **Fallback**: Images upload successfully even if alt text generation fails
+
+### Context Requirements
+
+- **Post Context**: Best results when images are uploaded to existing posts/pages
+- **Draft Posts**: Save posts as draft before uploading images for optimal context
+- **Bulk Processing**: Use Bulk Generator for processing images in existing posts
+
+## 🔄 Migration from Original Plugin
+
+This fork maintains full compatibility with the original plugin. Your existing settings and API keys will continue to work without any changes.
+
+## 🆘 Troubleshooting
+
+### Common Issues
+
+1. **API Key Errors**: Check the debug logs for specific API responses
+2. **Missing Context**: Use Bulk Generator to process images with proper post context
+3. **Format Issues**: Plugin automatically cleans AI-generated prefixes and quotes
+4. **Timeout Issues**: Large images processed asynchronously to prevent timeouts
+
+### Debug Information
+
+- **Check Debug Logs**: Contextual Alt Text → Debug Logs
+- **Context Information**: Look for "Context information collected" entries
+- **API Responses**: Monitor "generated contextual alt text" entries
+- **Error Details**: Review any error entries for specific issues
+
+### Getting Help
+
+- Check the debug logs in plugin settings
+- Verify API keys are correctly entered
+- Ensure billing is set up for paid APIs (OpenAI, Azure)
+- Test with smaller images first
+- Use Bulk Generator for better context awareness
+
+## 📄 License
+
+This plugin is licensed under GPL v3, maintaining the same license as the original work. You are free to use, modify, and distribute this plugin under the terms of the GPL v3 license.
+
+## 🙏 Credits
+
+- **Original Author**: [Valerio Monti](https://www.vmweb.it)
+- **Original Repository**: https://github.com/valeriomonti/auto-alt-text
+- **Fork Maintainer**: [Fuyuan Cheng](https://github.com/gloomcheng)
+
+This fork adds significant enhancements while maintaining full respect for the original author's work and GPL v3 license requirements.
+
+## 🚀 Key Improvements in This Fork
+
+- **Advanced Contextual Awareness**: Analyzes post content, title, categories, and tags for relevant alt text
+- **Joy Caption Beta One Integration**: State-of-the-art vision model for superior image understanding
+- **Two-Stage AI Processing**: Vision + Text model pipeline for optimal results
+- **Bulk Generator Tool**: Process multiple images with proper context awareness
+- **Multi-Provider Support**: Choose between HuggingFace, OpenAI, and Azure based on your needs
+- **Enhanced Security**: Improved API key encryption and secure storage
+- **Comprehensive Logging**: Detailed debug information for troubleshooting
+- **Auto-Cleanup**: Intelligent removal of AI-generated formatting artifacts
+- **Developer Friendly**: Hooks, filters, and extensible architecture for customization

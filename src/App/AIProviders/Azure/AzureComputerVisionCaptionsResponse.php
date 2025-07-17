@@ -1,12 +1,12 @@
 <?php
 
-namespace AATXT\App\AIProviders\Azure;
+namespace ContextualAltText\App\AIProviders\Azure;
 
-use AATXT\App\Admin\PluginOptions;
-use AATXT\App\AIProviders\AIProviderInterface;
-use AATXT\App\Exceptions\Azure\AzureComputerVisionException;
-use AATXT\App\Exceptions\Azure\AzureTranslateInstanceException;
-use AATXT\Config\Constants;
+use ContextualAltText\App\Admin\PluginOptions;
+use ContextualAltText\App\AIProviders\AIProviderInterface;
+use ContextualAltText\App\Exceptions\Azure\AzureComputerVisionException;
+use ContextualAltText\App\Exceptions\Azure\AzureTranslateInstanceException;
+use ContextualAltText\Config\Constants;
 
 class AzureComputerVisionCaptionsResponse implements AIProviderInterface
 {
@@ -21,30 +21,62 @@ class AzureComputerVisionCaptionsResponse implements AIProviderInterface
 
     /**
      * Make a request to Azure Computer Vision APIs to retrieve the contents of the uploaded image
-     * If necessary, translate the description into the requested language
-     * @param string $imageUrl
+     * Uses the selected language directly or falls back to translation if needed
+     *
+     * @param  string      $imageUrl
+     * @param  string|null $prompt
      * @return string
      * @throws AzureComputerVisionException
      * @throws AzureTranslateInstanceException
      */
-    public function response(string $imageUrl): string
+    public function response(string $imageUrl, ?string $prompt = null): string
     {
+        // Azure Computer Vision does not use a dynamic prompt.
+        // The $prompt parameter is ignored, but included for interface compatibility.
+
+        // Get the selected language from the new language settings
+        $selectedLanguage = PluginOptions::selectedLanguage();
+
+        // Map language codes to Azure-supported languages
+        $azureLanguageMapping = [
+            'en' => 'en',
+            'zh' => 'zh-Hans',
+            'zh-tw' => 'zh-Hant',
+            'ja' => 'ja',
+            'ko' => 'ko',
+            'es' => 'es',
+            'fr' => 'fr',
+            'de' => 'de',
+            'it' => 'it',
+            'pt' => 'pt',
+            'ru' => 'ru',
+            'ar' => 'ar',
+            'hi' => 'hi',
+            'th' => 'th',
+            'vi' => 'vi',
+        ];
+
+        // Use the mapped language or fallback to English
+        $azureLanguage = $azureLanguageMapping[$selectedLanguage] ?? 'en';
+
         $response = wp_remote_post(
-            PluginOptions::endpointAzureComputerVision() . 'computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=caption&language=en&gender-neutral-caption=False',
+            PluginOptions::endpointAzureComputerVision() . "computervision/imageanalysis:analyze?api-version=2023-02-01-preview&features=caption&language={$azureLanguage}&gender-neutral-caption=False",
             [
                 'headers' => [
                     'content-type' => 'application/json',
                     'Ocp-Apim-Subscription-Key' => PluginOptions::apiKeyAzureComputerVision(),
                 ],
-                'body' => json_encode([
+                'body' => json_encode(
+                    [
                     'url' => $imageUrl,
-                ]),
+                    ]
+                ),
                 'method' => 'POST',
             ]
         );
 
         $responseBody = wp_remote_retrieve_body($response);
-        if(empty($responseBody)) {
+        if (empty($responseBody)) {
             if (is_object($response) && property_exists($response, 'errors') && array_key_exists('http_request_failed', $response->errors)) {
                 throw new AzureTranslateInstanceException("Error: " . $response->errors['http_request_failed'][0]);
             }
@@ -60,13 +92,23 @@ class AzureComputerVisionCaptionsResponse implements AIProviderInterface
         }
 
         $altText = $bodyResult['captionResult']['text'];
-        $selectedLanguage = PluginOptions::languageAzureTranslateInstance();
-        
-        // If the default language (en) is selected it is not necessary a translation
-        if ($selectedLanguage == Constants::AATXT_AZURE_DEFAULT_LANGUAGE) {
-            return $altText;
+
+        // If Azure doesn't support the selected language directly, use translation as fallback
+        if ($azureLanguage === 'en' && $selectedLanguage !== 'en') {
+            $legacySelectedLanguage = PluginOptions::languageAzureTranslateInstance();
+            if (!empty($legacySelectedLanguage) && $legacySelectedLanguage !== 'en') {
+                return (AzureTranslator::make())->translate($altText, $legacySelectedLanguage);
+            }
         }
 
-        return (AzureTranslator::make())->translate($altText, $selectedLanguage);
+        return $altText;
+    }
+
+    /**
+     * @return string|null
+     */
+    public function getPrompt(): ?string
+    {
+        return get_option(Constants::CONTEXTUAL_ALT_TEXT_OPTION_FIELD_PROMPT_AZURE);
     }
 }

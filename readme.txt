@@ -1,160 +1,143 @@
-=== Auto Alt Text ===
-Contributors: valeriomonti
-Donate link: https://ko-fi.com/valeriomonti
-Tags: alt text, alt tag, accessibility, openai, seo
+=== Contextual Alt Text ===
+Contributors: gloomcheng, valeriomonti
+Donate link: https://www.buymeacoffee.com/gloomcheng
+Tags: alt text, alt tag, accessibility, a11y, context-aware, openai, huggingface, seo
 Requires at least: 6.0
 Tested up to: 6.7.2
-Stable tag: 2.4.2
-Requires PHP: 7.4
+Stable tag: 3.0.0
+Requires PHP: 8.1
 License: GPLv3
-License URI: http://www.gnu.org/licenses/gpl.html
+License URI: https://www.gnu.org/licenses/gpl-3.0.html
 
-This plugin allows you to automatically generate an Alt Text for images uploaded into the media library via AI.
+This plugin allows you to automatically generate Alt Text for the images that are uploaded to the site's media library. This fork enhances the original plugin by adding context-aware analysis, multi-provider support, and other features.
 
 == Description ==
 
-This plugin implements the automatic creation of alt text for images uploaded to the media library. The alt text is generated at the time of uploading the image and it is also possible to generate the alt text for images already present in the media library.
+This plugin automatically generates alt text for images using Artificial Intelligence. When you upload an image to the WordPress Media Library, it is sent to the AI service of your choice (OpenAI, Hugging Face, or Azure) to generate a descriptive and SEO-friendly alt text.
 
-To generate the alt text, you can choose to use the artificial intelligence of OpenAI or Azure, or decide if you simply want to copy the title of the article where the image is uploaded or the name of the image.
+A key feature of this enhanced version is **Context-Aware Analysis**. When enabled in the settings, the plugin will examine the title, content, and tags of the post or page where the image is being uploaded. This allows the AI to create alt text that is not just a description of the image, but is also highly relevant to the context of the article, significantly improving your site's accessibility and SEO.
 
-Clearly, using artificial intelligence will allow for a more accurate and useful alt texts.
+You can choose from various AI models, configure prompts, and manage API keys in the extensive settings page. The plugin also supports bulk generation and can be configured to preserve existing, manually set alt text.
+
+This fork is built upon the excellent work of Valerio Monti and is fully compliant with the GPL v3 license.
+
+= Accessibility (a11y) at the Core =
+
+Providing text alternatives for images is one of the most fundamental principles of web accessibility. This plugin is designed to help your site meet the **Web Content Accessibility Guidelines (WCAG)**, specifically:
+
+*   **WCAG 1.1.1 Non-text Content:** It ensures that all meaningful images have a text alternative (alt text) so that the information can be changed into other forms people need, such as large print, braille, speech, symbols or simpler language.
+
+By generating descriptive, context-aware alt texts, this plugin helps users with visual impairments who rely on screen readers understand the content and purpose of your images. It also benefits all users by making image content available when images fail to load.
 
 ## Features
 ___
 This plugin allows you to generate alt texts in the following ways:
-- using Openai APIs (GPT-4o, GPT-4o Mini, o1 Mini)
-- using Azure APIs for computational vision;
-- recovering the title of the image
-- recovering the title of the article in which the image is uploaded
+- using **OpenAI** APIs (GPT-4o, GPT-4o Mini, o1 Mini)
+- using **Hugging Face** APIs (e.g., Llava, Phi-3) for more cost-effective solutions.
+- using **Azure** APIs for computational vision.
+- recovering the **title of the article** in which the image is uploaded (context-aware).
+- recovering the **title of the image**.
 
 
 = Getting Started =
-After installing the plugin, click on the 'Auto Alt Text' menu item.
+After installing the plugin, click on the 'Contextual Alt Text' menu item.
 
 ## Choice of Generation Method
-Select the Generation Method you prefer
+Select the Generation Method you prefer. For all AI providers, you will need to enter your own API key.
 
-### OpenAI's APIs
-In your OpenAI account, retrieve the following data to enter on the options page:
-- API Key
-
-Enter a prompt for generating the alt text according to your needs.
+### OpenAI / Hugging Face APIs
+In your provider's account, retrieve the API Key to enter on the options page. You can then enter a custom prompt to guide the AI in generating the alt text according to your needs, including specifying the desired language.
 
 ### Azure's APIs
 On your Azure account, create a Computer Vision instance and retrieve the following data to enter on the options page:
 - Computer Vision API Key
 - Computer Vision Endpoint
 
-If you want to generate an alt text in English, save the options without filling in any other fields.
+If you want to generate an alt text in a different language via Azure, you will also need a Translator instance and provide its API Key, Endpoint, and Region.
 
-If you want to generate an alt text in a different language, on your Azure account, create a Translator instance and retrieve the following data to enter on the options page:
-- Translator Instance API Key
-- Translator Instance Endpoint
-- Translator Instance Region
-
-After entering this data, save the options.
-
-Select the desired language and save the options again.
-
-### Title of the article
-For this generation method, there are no options to set as the alt text will be generated by copying the title of the article in which the image is uploaded.
-
-In case the article is not uploaded as an attachment of an article, the "Title of the attachment" method will be used as a fallback.
-
-### Title of the attachment
-For this generation method, there are no options to set as the alt text will be generated by copying the title of the image.
+### Title of the article / attachment
+For these methods, no options are required. The alt text will be generated by copying the title of the article or the image itself.
 
 ## Functioning
 Once the plugin is configured, each time an image is uploaded to the media library, an alt text will be automatically set based on the selected generation method.
 
-For images already in the media library, you can create bulk alt texts. Open the Media Library in the "list" view, select the images for which to generate the alt text, and choose the "Generate alt text" bulk action. (Depending on the number of images chosen and their weight, this may take some time.)
+For images already in the media library, you can create bulk alt texts. Open the Media Library in the "list" view, select the images for which to generate the alt text, and choose the "Generate alt text" bulk action.
 
-You can also generate the alt text of a single image directly from the media library. Open the Media Library in “grid” mode, choose the image for which to generate the alt text, and click the “Generate alt text” button. In no time the alt text field will be overwritten by the generated description.
+You can also generate the alt text of a single image directly from the media library in "grid" mode by clicking the "Generate alt text" button.
 
-**Notice**: If you choose one of the methods that involves the use of external APIs, the upload times for images in the media library might increase because it requires sending a request to the APIs, waiting for the external server to process, and waiting for a response.
+**Notice**: Using external APIs will increase image upload times.
 
 ### Logging
-If the generation of the alt text via AI is set, in case of errors, to avoid blocking the editorial work, the image is loaded anyway but without the alt text being compiled.
-
-When a call to the Azure or OpenAI API fails, a record containing the error message is saved in a custom database table.
-In this case, the cause of the error can be seen on the Auto Alt Text -> Error log page.
+If an AI-powered generation fails, the image will still be loaded without alt text to avoid blocking editorial work. Errors are saved in a custom database table and can be viewed on the Contextual Alt Text -> Error log page.
 
 ## External Services
 This plugin uses the following external services alternatively:
 
+### Hugging Face
+Selecting an AI model from Hugging Face will use their API services. This plugin does not collect any information from your Hugging Face account. The data transmitted consists mainly of the image files and the specified prompt. For accurate information, please consult the [Hugging Face Privacy Policy](https://huggingface.co/privacy).
+
 ### OpenAI
-Selecting the generation method "OpenAI's APIs" will use the API services of [OpenAI](https://openai.com/).
-
-This plugin does not collect any information from your OpenAI account. The data transmitted to OpenAI mainly consists of the image files uploaded to your website and the specified prompt.
-
-For accurate information on privacy and conditions of use, please consult the [privacy policy](https://openai.com/policies/privacy-policy) and [terms and conditions](https://openai.com/) directly on the official website. It is also advisable to check the costs and usage statistics of the API service on the OpenAI website.
+Selecting an AI model from OpenAI will use their API services. For accurate information on privacy and conditions of use, please consult the [OpenAI privacy policy](https://openai.com/policies/privacy-policy) and [terms and conditions](https://openai.com/).
 
 ### Azure
-Selecting the "Azure's APIs" generation method will use the API services of [Microsoft Azure](https://azure.microsoft.com/en-us/).
-
-This plugin does not collect any information from your Azure account. The data transmitted to Azure consists mainly of image files uploaded to your website.
-
-For accurate information on privacy and conditions of use, please directly consult the [privacy policy](https://privacy.microsoft.com/en-us/privacystatement) and [terms and conditions](https://azure.microsoft.com/en-us/support/legal/) on the official website. It is also advisable to check the costs and usage statistics of the API service on the Microsoft Azure's website.
+Selecting the "Azure's APIs" generation method will use the API services of [Microsoft Azure](https://azure.microsoft.com/en-us/). For accurate information, please consult the [Microsoft Azure privacy policy](https://privacy.microsoft.com/en-us/privacystatement) and [terms and conditions](https://azure.microsoft.com/en-us/support/legal/).
 
 ## Encryption Constants
 
 We **strongly recommend** defining the new plugin-specific constants in your `wp-config.php`:
 
-`define( 'AAT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );`
-`define( 'AAT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );`
+`define( 'CAT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );`
+`define( 'CAT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );`
 
-You will find these two define(...) lines already generated for you on the Auto Alt Text » Options page – simply copy & paste them before the `/* That's all, stop editing! Happy publishing. */` line in your `wp-config.php`.
+You will find these two define(...) lines already generated for you on the Contextual Alt Text » Options page – simply copy & paste them before the `/* That's all, stop editing! Happy publishing. */` line in your `wp-config.php`.
 
 If you choose not to add them, the plugin will continue to work normally, but it will fall back to using your WordPress `LOGGED_IN_KEY` / `LOGGED_IN_SALT`, which may break if those salts are ever changed.
 
 ## Disclaimer
-Auto Alt Text is a plugin that helps users automatically generate Alt Texts of their images using AI services such as OpenAI's ChatGPT or Microsoft Azure.
-Users need their own API key and must follow the rules set by the AI service they choose.
-
-By using Auto Alt Text, users agree to watch and manage AI-made content and address any issues or misuse.
-
-AI Engine developer and related parties are not responsible for any problems or losses caused by the use of the plugin or AI-generated content.
-
+Contextual Alt Text is a plugin that helps users automatically generate Alt Texts of their images using AI services. Users need their own API key and must follow the rules set by the AI service they choose. By using this plugin, users agree to watch and manage AI-made content and address any issues or misuse. The developer and related parties are not responsible for any problems or losses caused by the use of the plugin or AI-generated content.
 
 == Frequently Asked Questions ==
 
 = Is it mandatory to use external AI services? =
-No, but if you want to leverage the capabilities of AI, you must have an Azure or OpenAI account. Otherwise, you can choose one of the two methods that do not use AI.
+No. You can choose to generate the alt text from the article or attachment title, which does not use AI.
 
-= Which generation method should I choose to obtain an accurate description of the image? =
-If you wish to obtain the most accurate description possible of the image, you should use the "OpenAI's APIs" or "Azure's APIs" method.
+= Which generation method should I choose for the most accurate description? =
+For the most accurate and context-aware description, use one of the AI-powered methods (OpenAI, Hugging Face, or Azure).
 
-= Why do I see the error “There was a problem with the encryption of your API Key for alt text generation. Please re-enter the key and save”? =
+= Why do I see the error "There was a problem with the encryption of your API Key..."? =
 
-This message appears because the plugin was unable to decrypt your stored API Key. In most cases this happens when the cryptographic “salt” or “key” it originally used to encrypt your API Key has changed since you first saved it.
+This message appears because the plugin was unable to decrypt your stored API Key. This usually happens when the cryptographic "salt" or "key" has changed since you first saved it.
 
 **Common causes**
-- You (or another plugin) have changed the WordPress authentication salts (`LOGGED_IN_KEY` / `LOGGED_IN_SALT`) in your `wp-config.php` after saving the API Key.
-- You haven’t defined the recommended plugin-specific constants (`AAT_ENCRYPTION_KEY` / `AAT_ENCRYPTION_SALT`) in your `wp-config.php`, so the plugin fell back to the WordPress salts.
+- You (or another plugin) have changed the WordPress authentication salts (`LOGGED_IN_KEY` / `LOGGED_IN_SALT`) in your `wp-config.php`.
+- You haven't defined the recommended plugin-specific constants (`CAT_ENCRYPTION_KEY` / `CAT_ENCRYPTION_SALT`), so the plugin fell back to the WordPress salts.
 
 **How to fix**
-1. Go to **Auto Alt Text » Options** in your WordPress admin.
-2. Re-enter your API Key in the appropriate field and click **Save Changes**.
-3. _(Recommended)_ Prevent this issue in the future by adding these lines **before** the `/* That's all, stop editing! Happy publishing. */` comment in your `wp-config.php`:
+1. Go to **Contextual Alt Text » Options** in your WordPress admin.
+2. Re-enter your API Key and click **Save Changes**.
+3. _(Recommended)_ Add the following lines to your `wp-config.php`:
    ```
-   define( 'AAT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );
-   define( 'AAT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );
+   define( 'CAT_ENCRYPTION_KEY',  'a_random_string_of_at_least_64_characters' );
+   define( 'CAT_ENCRYPTION_SALT', 'another_random_string_of_at_least_64_characters' );
    ```
 
-This ensures the plugin uses stable, plugin-specific values for encryption and won’t break if WordPress salts are ever changed again.
-
-Once you’ve re-entered your API Key (and, if desired, added the constants), hit Save Changes — the plugin will re-encrypt your key correctly and the error will disappear
+This ensures the plugin uses stable, plugin-specific values for encryption.
 
 == Screenshots ==
 
-1. Azure's APIs method options page
-2. OpenAI's APIs method options page
-3. Title of the article options page
-4. Title of the attachment options page
-5. Bulk alt text generation
-6. Single image alt text generation
+1. Options page for AI-generated alt text.
+2. Bulk alt text generation in the media library.
+3. Single image alt text generation.
 
 == Changelog ==
+= 3.0.0 =
+- **Major Refactor & Rebrand**: Forked from `auto-alt-text` and rebranded as `Contextual Alt Text`.
+- **New Feature**: Added support for Hugging Face as a cost-effective AI provider.
+- **New Feature**: Implemented context-aware alt text generation that can analyze surrounding post content.
+- **New Feature**: Enabled direct generation of alt text in desired languages via prompting, removing the need for a separate translation step.
+- **Enhancement**: Restructured the codebase with a new `contextual-alt-text` slug, updated namespaces, constants, and database options.
+- **A11y**: Added explicit information about how the plugin helps meet WCAG 1.1.1 for accessibility.
+
 = 2.4.2 =
 - Modify documentation and build again the assets
 
@@ -162,7 +145,7 @@ Once you’ve re-entered your API Key (and, if desired, added the constants), hi
 - Fixed: Alt text now correctly persists when generated from both the post media overlay and the main Media Library.
 
 = 2.4.0 =
-- Introduce two new plugin-specific constants, `AATXT_ENCRYPTION_KEY` and `AATXT_ENCRYPTION_SALT`, allowing API keys to be encrypted independently of WordPress’s own salts.
+- Introduce two new plugin-specific constants, `CAT_ENCRYPTION_KEY` and `CAT_ENCRYPTION_SALT`, allowing API keys to be encrypted independently of WordPress's own salts.
 - Implement automatic migration of existing encrypted API keys: on upgrade, keys encrypted with the old WP salts are decrypted (if possible) and re-encrypted with the new plugin key.
 - Add an optional info notice on the Auto Alt Text options page showing the ready-to-copy `define()` statements for `wp-config.php`.
 - Maintain full backward-compatibility: if the new constants are not defined, the plugin continues to use the WordPress `LOGGED_IN_KEY`/`LOGGED_IN_SALT` fallback without interruption.
@@ -221,4 +204,10 @@ Once you’ve re-entered your API Key (and, if desired, added the constants), hi
 - Plugin released
 
 == Upgrade Notice ==
-- Plugin released
+
+= 3.0.0 =
+This version is a major update and rebrand from the original "Auto Alt Text" plugin. It introduces new features like Hugging Face support and context-aware generation. While we have aimed for backward compatibility, please test after upgrading.
+
+== Fork Notice ==
+
+**Contextual Alt Text** is a fork of the excellent [Auto Alt Text](https://wordpress.org/plugins/auto-alt-text/) plugin by Valerio Monti. We are grateful for his original work and have built upon it to add new features and a different focus. All original license terms under GPLv3 are respected.

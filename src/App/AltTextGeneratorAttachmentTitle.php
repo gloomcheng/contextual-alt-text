@@ -1,9 +1,9 @@
 <?php
-namespace AATXT\App;
+
+namespace ContextualAltText\App;
 
 class AltTextGeneratorAttachmentTitle implements AltTextGeneratorInterface
 {
-
     private function __construct()
     {
     }
@@ -18,7 +18,8 @@ class AltTextGeneratorAttachmentTitle implements AltTextGeneratorInterface
 
     /**
      * Get the alt text of the image
-     * @param int $imageId
+     *
+     * @param  int $imageId
      * @return string
      */
     public function altText(int $imageId): string

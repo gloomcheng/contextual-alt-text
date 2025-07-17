@@ -1,5 +1,6 @@
 <?php
-namespace AATXT\App;
+
+namespace ContextualAltText\App;
 
 interface AltTextGeneratorInterface
 {

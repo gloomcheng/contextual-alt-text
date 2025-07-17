@@ -15,7 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const spinner = document.getElementById('loading-spinner');
 
         // Nonce token provided by WordPress for security
-        const nonce = AATXT?.altTextNonce;
+        const nonce = CONTEXTUAL_ALT_TEXT?.altTextNonce;
 
         // Set UI to loading state: disable button and show spinner
         toggleUIState(button, spinner, true);
